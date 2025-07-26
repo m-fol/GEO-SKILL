@@ -7,11 +7,13 @@
        alt="image" />
 </p>
 
-**Forest Risk Explorer** is a web-based GIS application that visualizes forest health across Greece using Sentinel-2 NDVI data, protected biodiversity zones, and human activity layers informed by ESCO skill categories. Designed with the context of Earth Observation (EO) and the European Space Agency (ESA) in mind, this tool demonstrates how remote sensing and occupational data can be combined to explore environmental change and socio-economic impact.
+**Forest Risk Explorer** is a web-based GIS application that visualizes forest health across Greece using Sentinel-2 NDVI data, protected biodiversity zones and human activity layers informed by ESCO skill categories. 
+
+Designed with the context of Earth Observation (EO) and the European Space Agency (ESA) in mind, this tool demonstrates how remote sensing and occupational data can be combined to explore environmental change and socio-economic impact.
 
 ---
 
-## 🎯 Objectives
+## Objectives
 
 - Monitor forest degradation trends in Greece from 2017–2024 using NDVI indices
 - Overlay critical biodiversity hotspots such as Natura 2000 zones
@@ -20,7 +22,7 @@
 
 ---
 
-## 📂 Project Structure
+## Project Structure
 
 ```
 forest-risk-explorer/
@@ -35,7 +37,7 @@ forest-risk-explorer/
 
 ---
 
-## 🗺️ Data Sources & Assumptions
+## Data Sources & Assumptions
 
 - **NDVI layers** were generated using Sentinel-2 SR data from the Copernicus program via Google Earth Engine. Each file contains simplified mock polygons simulating vegetation health.
 - **Biodiversity zones** are based on public Natura 2000 protected areas and represent ecologically sensitive forest regions.
@@ -45,7 +47,7 @@ All mock data was generated to reflect realistic spatial distributions and thema
 
 ---
 
-## 💻 How to Run
+## Running It
 
 ### Option 1: Local (No Server Needed)
 Just open `index.html` in your browser, and ensure the `/data/` folder is in the same directory.
@@ -64,7 +66,7 @@ Then visit: [http://localhost:8000](http://localhost:8000)
 
 ---
 
-## 📚 Academic Relevance
+## Research-Related Part
 
 This application demonstrates the practical intersection of:
 - **Remote sensing & EO data processing** (NDVI, Sentinel-2)
@@ -72,12 +74,4 @@ This application demonstrates the practical intersection of:
 - **Skill sector geospatial mapping using ESCO and land use**
 - **Open-source GIS technology** (Leaflet.js, GeoJSON, OSM)
 
-It is suitable for research, policy exploration, ESA EO training projects, and academic presentations on sustainability, environmental monitoring, and geospatial web applications.
-
----
-
-## 👨‍🔬 Author
-
-**Forest Risk Explorer** was developed for educational and research purposes in alignment with the European Space Agency’s educational initiatives. It may serve as a basis for further expansion into real-time EO monitoring dashboards, occupational analysis systems, or forest policy decision support tools.
-
----
+It is suitable for research, policy exploration, ESA EO training projects, and academic presentations on sustainability, environmental monitoring and geospatial web applications.
