@@ -1,11 +1,11 @@
 # 🌲 Mapping Biodiversity and Human Impact in Greek Forests 🌲
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/6b652bd3-e9f8-44c0-ac71-a0e642cb8abe" 
-       width="926" 
-       height="351" 
-       alt="image" />
+  <img src="https://github.com/user-attachments/assets/2ddf468b-44cb-4560-81ea-6f70727da1a4" 
+       width="1536" 
+       height="398" />
 </p>
+
 
 **Forest Risk Explorer** is a web-based GIS application that visualizes forest health across Greece using Sentinel-2 NDVI data, protected biodiversity zones and human activity layers informed by ESCO skill categories. 
 
