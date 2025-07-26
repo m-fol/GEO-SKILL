@@ -13,7 +13,8 @@
       font-family: 'Inter', sans-serif;
     }
     #map {
-      height: 100%;
+      height: 100vh;
+      width: 100%;
     }
     .panel {
       background: linear-gradient(to bottom right, #f0f9ff, #e0f7fa);
@@ -62,25 +63,33 @@
   </div>
 
   <script>
-    const map = L.map('map').setView([40.6, 22.9], 7); // Greece center
+    const map = L.map('map').setView([39.5, 22.0], 6); // Greece approx.
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
-    let ndviLayer;
-    let biodiversityLayer;
-    let escoLayer;
+    let ndviLayer, biodiversityLayer, escoLayer;
 
     const yearSelector = document.getElementById('yearSelector');
     const biodiversityToggle = document.getElementById('biodiversityToggle');
     const escoToggle = document.getElementById('escoToggle');
 
-    function loadGeoJSONLayer(url, style, onEachFeature) {
-      return fetch(url)
-        .then(res => res.json())
-        .then(data => L.geoJSON(data, { style, onEachFeature }));
+    async function loadGeoJSONLayer(url, styleFn, onEachFeatureFn) {
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`Failed to load ${url}`);
+        const data = await response.json();
+        const layer = L.geoJSON(data, {
+          style: styleFn,
+          onEachFeature: onEachFeatureFn
+        });
+        return layer;
+      } catch (err) {
+        console.error(err);
+        return null;
+      }
     }
 
     async function updateMap() {
@@ -88,26 +97,29 @@
 
       if (ndviLayer) map.removeLayer(ndviLayer);
       ndviLayer = await loadGeoJSONLayer(`data/ndvi_${year}.geojson`,
-        feature => ({ color: 'green', weight: 1, fillOpacity: 0.4 })
+        () => ({ color: 'green', weight: 1, fillOpacity: 0.4 })
       );
-      ndviLayer.addTo(map);
+      if (ndviLayer) {
+        ndviLayer.addTo(map);
+        map.fitBounds(ndviLayer.getBounds());
+      }
 
       if (biodiversityLayer) map.removeLayer(biodiversityLayer);
       if (biodiversityToggle.checked) {
         biodiversityLayer = await loadGeoJSONLayer('data/biodiversity.geojson',
-          feature => ({ color: 'red', weight: 2, fillOpacity: 0.3 }),
+          () => ({ color: 'red', weight: 2, fillOpacity: 0.3 }),
           (feature, layer) => layer.bindPopup(feature.properties.name || 'Biodiversity Zone')
         );
-        biodiversityLayer.addTo(map);
+        if (biodiversityLayer) biodiversityLayer.addTo(map);
       }
 
       if (escoLayer) map.removeLayer(escoLayer);
       if (escoToggle.checked) {
         escoLayer = await loadGeoJSONLayer('data/esco.geojson',
-          feature => ({ color: 'blue', weight: 1, fillOpacity: 0.2 }),
+          () => ({ color: 'blue', weight: 1, fillOpacity: 0.2 }),
           (feature, layer) => layer.bindPopup(`Skill: ${feature.properties.skill || 'Unknown'}`)
         );
-        escoLayer.addTo(map);
+        if (escoLayer) escoLayer.addTo(map);
       }
     }
 
