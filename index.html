@@ -30,14 +30,8 @@
       <div class="mb-6">
         <label class="block mb-2 text-teal-800 font-semibold">Select Year</label>
         <select id="yearSelector" class="w-full p-3 border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500">
-          <option value="2024">2024</option>
+          <option value="2024" selected>2024</option>
           <option value="2023">2023</option>
-          <option value="2022">2022</option>
-          <option value="2021">2021</option>
-          <option value="2020">2020</option>
-          <option value="2019">2019</option>
-          <option value="2018">2018</option>
-          <option value="2017">2017</option>
         </select>
       </div>
 
@@ -63,7 +57,7 @@
   </div>
 
   <script>
-    const map = L.map('map').setView([39.5, 22.0], 6); // Greece approx.
+    const map = L.map('map').setView([39.5, 22.0], 6);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
@@ -76,57 +70,100 @@
     const biodiversityToggle = document.getElementById('biodiversityToggle');
     const escoToggle = document.getElementById('escoToggle');
 
-    async function loadGeoJSONLayer(url, styleFn, onEachFeatureFn) {
-      try {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`Failed to load ${url}`);
-        const data = await response.json();
-        const layer = L.geoJSON(data, {
-          style: styleFn,
-          onEachFeature: onEachFeatureFn
-        });
-        return layer;
-      } catch (err) {
-        console.error(err);
-        return null;
-      }
+    const ndviData = {
+      "type": "FeatureCollection",
+      "features": Array.from({ length: 20 }, (_, i) => ({
+        "type": "Feature",
+        "properties": { "ndvi": Math.random().toFixed(2) },
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [[
+            [20.5 + i * 0.2, 38.5],
+            [20.7 + i * 0.2, 38.5],
+            [20.7 + i * 0.2, 38.7],
+            [20.5 + i * 0.2, 38.7],
+            [20.5 + i * 0.2, 38.5]
+          ]]
+        }
+      }))
+    };
+
+    const biodiversityData = {
+      "type": "FeatureCollection",
+      "features": Array.from({ length: 12 }, (_, i) => ({
+        "type": "Feature",
+        "properties": { "name": `Protected Zone ${i + 1}` },
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [[
+            [22 + i * 0.3, 39],
+            [22.2 + i * 0.3, 39],
+            [22.2 + i * 0.3, 39.2],
+            [22 + i * 0.3, 39.2],
+            [22 + i * 0.3, 39]
+          ]]
+        }
+      }))
+    };
+
+    const escoData = {
+      "type": "FeatureCollection",
+      "features": Array.from({ length: 10 }, (_, i) => ({
+        "type": "Feature",
+        "properties": { "skill": ["Forestry", "Ecology", "GIS", "Sustainability"][i % 4] },
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [[
+            [21 + i * 0.4, 37.8],
+            [21.3 + i * 0.4, 37.8],
+            [21.3 + i * 0.4, 38.1],
+            [21 + i * 0.4, 38.1],
+            [21 + i * 0.4, 37.8]
+          ]]
+        }
+      }))
+    };
+
+    function loadGeoJSONLayer(data, styleFn, onEachFeatureFn) {
+      return L.geoJSON(data, {
+        style: styleFn,
+        onEachFeature: onEachFeatureFn
+      });
     }
 
     async function updateMap() {
       const year = yearSelector.value;
 
       if (ndviLayer) map.removeLayer(ndviLayer);
-      ndviLayer = await loadGeoJSONLayer(`data/ndvi_${year}.geojson`,
+      ndviLayer = loadGeoJSONLayer(ndviData,
         () => ({ color: 'green', weight: 1, fillOpacity: 0.4 })
       );
-      if (ndviLayer) {
-        ndviLayer.addTo(map);
-        map.fitBounds(ndviLayer.getBounds());
-      }
+      ndviLayer.addTo(map);
+      map.fitBounds(ndviLayer.getBounds());
 
       if (biodiversityLayer) map.removeLayer(biodiversityLayer);
       if (biodiversityToggle.checked) {
-        biodiversityLayer = await loadGeoJSONLayer('data/biodiversity.geojson',
+        biodiversityLayer = loadGeoJSONLayer(biodiversityData,
           () => ({ color: 'red', weight: 2, fillOpacity: 0.3 }),
-          (feature, layer) => layer.bindPopup(feature.properties.name || 'Biodiversity Zone')
+          (feature, layer) => layer.bindPopup(feature.properties.name)
         );
-        if (biodiversityLayer) biodiversityLayer.addTo(map);
+        biodiversityLayer.addTo(map);
       }
+
 
       if (escoLayer) map.removeLayer(escoLayer);
       if (escoToggle.checked) {
-        escoLayer = await loadGeoJSONLayer('data/esco.geojson',
+        escoLayer = loadGeoJSONLayer(escoData,
           () => ({ color: 'blue', weight: 1, fillOpacity: 0.2 }),
-          (feature, layer) => layer.bindPopup(`Skill: ${feature.properties.skill || 'Unknown'}`)
+          (feature, layer) => layer.bindPopup(`Skill: ${feature.properties.skill}`)
         );
-        if (escoLayer) escoLayer.addTo(map);
+        escoLayer.addTo(map);
       }
     }
 
     yearSelector.addEventListener('change', updateMap);
     biodiversityToggle.addEventListener('change', updateMap);
     escoToggle.addEventListener('change', updateMap);
-
     updateMap();
   </script>
 </body>
