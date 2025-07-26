@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Forest Risk Explorer - Greece</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    #map {
+      height: 100%;
+    }
+    .panel {
+      background: linear-gradient(to bottom right, #f0f9ff, #e0f7fa);
+    }
+  </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+  <div class="flex h-screen">
+    <!-- Sidebar -->
+    <div class="w-1/4 p-6 panel shadow-2xl overflow-y-auto">
+      <h1 class="text-2xl font-bold text-teal-700 mb-6">🌲 Forest Risk Explorer</h1>
+
+      <div class="mb-6">
+        <label class="block mb-2 text-teal-800 font-semibold">Select Year</label>
+        <select id="yearSelector" class="w-full p-3 border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500">
+          <option value="2024">2024</option>
+          <option value="2023">2023</option>
+          <option value="2022">2022</option>
+          <option value="2021">2021</option>
+          <option value="2020">2020</option>
+          <option value="2019">2019</option>
+          <option value="2018">2018</option>
+          <option value="2017">2017</option>
+        </select>
+      </div>
+
+      <div class="mb-6">
+        <label class="block mb-2 text-teal-800 font-semibold">Layers</label>
+        <div class="space-y-2">
+          <label class="flex items-center">
+            <input type="checkbox" id="biodiversityToggle" checked class="form-checkbox h-5 w-5 text-teal-600">
+            <span class="ml-2 text-gray-700">🦋 Biodiversity Zones</span>
+          </label>
+          <label class="flex items-center">
+            <input type="checkbox" id="escoToggle" checked class="form-checkbox h-5 w-5 text-blue-600">
+            <span class="ml-2 text-gray-700">🧑‍🌾 ESCO Skill Areas</span>
+          </label>
+        </div>
+      </div>
+
+      <p class="text-sm text-gray-500 mt-8">Built with ❤️ using Sentinel-2, Leaflet, and ESCO data.</p>
+    </div>
+
+    <!-- Map -->
+    <div id="map" class="flex-1"></div>
+  </div>
+
+  <script>
+    const map = L.map('map').setView([40.6, 22.9], 7); // Greece center
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    let ndviLayer;
+    let biodiversityLayer;
+    let escoLayer;
+
+    const yearSelector = document.getElementById('yearSelector');
+    const biodiversityToggle = document.getElementById('biodiversityToggle');
+    const escoToggle = document.getElementById('escoToggle');
+
+    function loadGeoJSONLayer(url, style, onEachFeature) {
+      return fetch(url)
+        .then(res => res.json())
+        .then(data => L.geoJSON(data, { style, onEachFeature }));
+    }
+
+    async function updateMap() {
+      const year = yearSelector.value;
+
+      if (ndviLayer) map.removeLayer(ndviLayer);
+      ndviLayer = await loadGeoJSONLayer(`data/ndvi_${year}.geojson`,
+        feature => ({ color: 'green', weight: 1, fillOpacity: 0.4 })
+      );
+      ndviLayer.addTo(map);
+
+      if (biodiversityLayer) map.removeLayer(biodiversityLayer);
+      if (biodiversityToggle.checked) {
+        biodiversityLayer = await loadGeoJSONLayer('data/biodiversity.geojson',
+          feature => ({ color: 'red', weight: 2, fillOpacity: 0.3 }),
+          (feature, layer) => layer.bindPopup(feature.properties.name || 'Biodiversity Zone')
+        );
+        biodiversityLayer.addTo(map);
+      }
+
+      if (escoLayer) map.removeLayer(escoLayer);
+      if (escoToggle.checked) {
+        escoLayer = await loadGeoJSONLayer('data/esco.geojson',
+          feature => ({ color: 'blue', weight: 1, fillOpacity: 0.2 }),
+          (feature, layer) => layer.bindPopup(`Skill: ${feature.properties.skill || 'Unknown'}`)
+        );
+        escoLayer.addTo(map);
+      }
+    }
+
+    yearSelector.addEventListener('change', updateMap);
+    biodiversityToggle.addEventListener('change', updateMap);
+    escoToggle.addEventListener('change', updateMap);
+
+    updateMap();
+  </script>
+</body>
+</html>
