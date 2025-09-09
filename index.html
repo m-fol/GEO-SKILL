@@ -2,16 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
   <title>Forest Risk Explorer - Greece</title>
+
+  <!-- UI + Leaflet -->
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-  <!-- COG + Raster libs -->
-  <script src="https://cdn.jsdelivr.net/npm/geotiff/dist/geotiff.browser.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/georaster/dist/georaster.browser.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/georaster-layer-for-leaflet/dist/georaster-layer-for-leaflet.min.js"></script>
+
+  <!-- Esri Leaflet for WDPA FeatureService -->
+  <script src="https://unpkg.com/esri-leaflet@3.0.12/dist/esri-leaflet.js"></script>
+
   <style>
     body { font-family: 'Inter', sans-serif; }
     #map { height: 100vh; width: 100%; }
@@ -20,10 +22,10 @@
       background: white; padding: 8px 10px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);
       font-size: 12px; line-height: 1.25;
     }
-    .ndvi-gradient { height: 8px; background: linear-gradient(to right, rgb(255,0,0), rgb(255,200,0), rgb(200,255,0), rgb(0,160,0)); border-radius: 4px; margin: 6px 0; }
+    .ndvi-gradient { height: 8px; background: linear-gradient(to right,#ff0000,#ffc800,#c8ff00,#00a000); border-radius: 4px; margin: 6px 0; }
     .loader {
       position: absolute; top: 12px; right: 12px; z-index: 1000;
-      background: rgba(255,255,255,0.9); padding: 8px 12px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      background: rgba(255,255,255,0.95); padding: 8px 12px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
       display: none; align-items: center; gap: 8px; font-size: 12px;
     }
     .spinner { width: 14px; height: 14px; border: 2px solid #14b8a6; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
@@ -56,20 +58,23 @@
         <div class="space-y-2">
           <label class="flex items-center">
             <input type="checkbox" id="ndviToggle" checked class="form-checkbox h-5 w-5 text-green-600">
-            <span class="ml-2 text-gray-700">🌿 Sentinel-2 NDVI (real data)</span>
+            <span class="ml-2 text-gray-700">🌿 Sentinel-2 NDVI (real tiles)</span>
           </label>
           <label class="flex items-center">
-            <input type="checkbox" id="biodiversityToggle" checked class="form-checkbox h-5 w-5 text-teal-600">
-            <span class="ml-2 text-gray-700">🦋 Biodiversity Zones</span>
+            <input type="checkbox" id="wdpaToggle" checked class="form-checkbox h-5 w-5 text-purple-600">
+            <span class="ml-2 text-gray-700">🛡️ Protected Areas (WDPA)</span>
           </label>
+          <!-- OPTIONAL: uncomment if you have a stable HTTPS Natura 2000 WMS -->
+          <!--
           <label class="flex items-center">
-            <input type="checkbox" id="escoToggle" checked class="form-checkbox h-5 w-5 text-blue-600">
-            <span class="ml-2 text-gray-700">🧑‍🌾 ESCO Skill Areas</span>
+            <input type="checkbox" id="naturaToggle" class="form-checkbox h-5 w-5 text-red-600">
+            <span class="ml-2 text-gray-700">🦋 Natura 2000 (WMS)</span>
           </label>
+          -->
         </div>
       </div>
 
-      <p class="text-sm text-gray-500 mt-8">Built with ❤️ using Sentinel-2 (L2A COGs), Leaflet, and ESCO data.</p>
+      <p class="text-sm text-gray-500 mt-8">Built with ❤️ using Sentinel-2, Leaflet & WDPA.</p>
     </div>
 
     <!-- Map -->
@@ -80,61 +85,36 @@
   </div>
 
   <script>
-    // --- Map setup ---
+    // Map + base
     const map = L.map('map').setView([39.5, 22.0], 6);
-    const osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19, attribution: '© OpenStreetMap contributors'
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19, attribution: '© OpenStreetMap'
     }).addTo(map);
 
-    // --- UI refs ---
+    // UI refs
     const yearSelector = document.getElementById('yearSelector');
-    const cloudSlider = document.getElementById('cloudSlider');
-    const cloudValue = document.getElementById('cloudValue');
-    const ndviToggle = document.getElementById('ndviToggle');
-    const biodiversityToggle = document.getElementById('biodiversityToggle');
-    const escoToggle = document.getElementById('escoToggle');
-    const loader = document.getElementById('loader');
-    const loaderText = document.getElementById('loaderText');
+    const cloudSlider  = document.getElementById('cloudSlider');
+    const cloudValue   = document.getElementById('cloudValue');
+    const ndviToggle   = document.getElementById('ndviToggle');
+    const wdpaToggle   = document.getElementById('wdpaToggle');
+    // const naturaToggle = document.getElementById('naturaToggle');
+    const loader       = document.getElementById('loader');
+    const loaderText   = document.getElementById('loaderText');
 
     cloudSlider.addEventListener('input', () => cloudValue.textContent = cloudSlider.value);
 
-    // --- Helpers: Greece AOI (broad bbox polygon) ---
+    // Greece AOI (broad bbox)
     const greeceAOI = {
       type: "Polygon",
-      coordinates: [[
-        [19.0, 34.5],[29.8, 34.5],[29.8, 41.9],[19.0, 41.9],[19.0, 34.5]
-      ]]
+      coordinates: [[ [19.0,34.5],[29.8,34.5],[29.8,41.9],[19.0,41.9],[19.0,34.5] ]]
     };
 
-    // --- Mock overlay data (as before) ---
-    const biodiversityData = {
-      "type":"FeatureCollection",
-      "features": Array.from({ length: 12 }, (_, i) => ({
-        "type":"Feature",
-        "properties":{ "name": `Protected Zone ${i+1}` },
-        "geometry":{ "type":"Polygon", "coordinates":[[
-          [22+i*0.3,39],[22.2+i*0.3,39],[22.2+i*0.3,39.2],[22+i*0.3,39.2],[22+i*0.3,39]
-        ]]}
-      }))
-    };
-    const escoData = {
-      "type":"FeatureCollection",
-      "features": Array.from({ length: 10 }, (_, i) => ({
-        "type":"Feature",
-        "properties":{ "skill": ["Forestry","Ecology","GIS","Sustainability"][i%4] },
-        "geometry":{ "type":"Polygon", "coordinates":[[
-          [21+i*0.4,37.8],[21.3+i*0.4,37.8],[21.3+i*0.4,38.1],[21+i*0.4,38.1],[21+i*0.4,37.8]
-        ]]}
-      }))
-    };
+    // Layers
+    let ndviTiles = null;
+    let wdpaLayer = null;
+    // let naturaLayer = null;
 
-    function loadGeoJSONLayer(data, styleFn, onEachFeatureFn) {
-      return L.geoJSON(data, { style: styleFn, onEachFeature: onEachFeatureFn });
-    }
-
-    let ndviLayer = null, biodiversityLayer = null, escoLayer = null;
-
-    // --- NDVI legend control ---
+    // NDVI legend
     const ndviLegend = L.control({ position: 'bottomright' });
     ndviLegend.onAdd = function() {
       const div = L.DomUtil.create('div', 'leaflet-control ndvi-legend');
@@ -147,146 +127,116 @@
       return div;
     };
 
-    // --- STAC search for latest Sentinel-2 L2A scene over AOI/year ---
-    async function fetchLatestS2COGs(year, maxCloud=20, aoi=greeceAOI) {
+    // Build a Titiler STAC NDVI tile URL for the latest S2 scene in year/cloud/AOI
+    async function buildNdviTileUrl(year, maxCloud, aoi) {
       const body = {
         collections: ["sentinel-2-l2a"],
         intersects: aoi,
         limit: 1,
         sortby: [{ field: "properties.datetime", direction: "desc" }],
-        query: {
-          "eo:cloud_cover": { "lt": Number(maxCloud) },
-          "platform": { "eq": "sentinel-2a" } // prefer S2A; remove if you want either
-        },
+        query: { "eo:cloud_cover": { lt: Number(maxCloud) } },
         datetime: `${year}-01-01T00:00:00Z/${year}-12-31T23:59:59Z`
       };
-      const res = await fetch("https://earth-search.aws.element84.com/v1/search", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
+      const resp = await fetch("https://earth-search.aws.element84.com/v1/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
       });
-      if (!res.ok) throw new Error(`STAC search failed (${res.status})`);
-      const json = await res.json();
+      if (!resp.ok) throw new Error(`STAC search failed (${resp.status})`);
+      const json = await resp.json();
       const feat = json.features?.[0];
-      if (!feat) throw new Error("No Sentinel-2 scenes found for filters");
-      const assets = feat.assets || {};
-      // Prefer 10m bands
-      return {
-        // COG URLs
-        red: assets.red?.href || assets.B04?.href,
-        nir: assets.nir?.href || assets.B08?.href,
-        date: feat.properties.datetime,
-        cloud: feat.properties["eo:cloud_cover"]
-      };
+      if (!feat) throw new Error("No Sentinel-2 scenes matched your filters.");
+
+      // STAC item URL (public)
+      const itemUrl = `https://earth-search.aws.element84.com/v1/collections/${feat.collection}/items/${encodeURIComponent(feat.id)}`;
+
+      // Titiler STAC endpoint with NDVI expression from B08 (NIR) and B04 (RED)
+      const url =
+        `https://titiler.xyz/stac/tiles/WebMercatorQuad/{z}/{x}/{y}@1x` +
+        `?url=${encodeURIComponent(itemUrl)}` +
+        `&assets=B08,B04` +
+        `&expression=(B08-B04)/(B08+B04)` +
+        `&rescale=-0.2,0.8` +
+        `&colormap=viridis`;
+
+      return { tileUrl: url, date: feat.properties.datetime, cloud: feat.properties["eo:cloud_cover"] };
     }
 
-    // --- Build NDVI raster layer from two COGs ---
-    async function buildNDVILayerFromCOGs(redHref, nirHref) {
-      const [redBuf, nirBuf] = await Promise.all([
-        fetch(redHref).then(r => r.arrayBuffer()),
-        fetch(nirHref).then(r => r.arrayBuffer())
-      ]);
+    async function updateNdvi() {
+      if (ndviTiles) { map.removeLayer(ndviTiles); ndviTiles = null; }
+      if (!ndviToggle.checked) { try { map.removeControl(ndviLegend); } catch(e){}; return; }
 
-      const [redRaster, nirRaster] = await Promise.all([
-        parseGeoraster(redBuf),
-        parseGeoraster(nirBuf)
-      ]);
+      loader.style.display = 'flex';
+      loaderText.textContent = 'Searching Sentinel-2…';
 
-      const layer = new GeoRasterLayer({
-        georasters: [nirRaster, redRaster], // [NIR, RED]
-        opacity: 0.85,
-        resolution: 64, // tradeoff quality vs. speed; lower=sharper/higher CPU
-        pixelValuesToColorFn: (values) => {
-          const nir = values[0];
-          const red = values[1];
-          if (nir == null || red == null) return null;
+      try {
+        const year = yearSelector.value;
+        const maxCloud = cloudSlider.value;
+        const { tileUrl, date, cloud } = await buildNdviTileUrl(year, maxCloud, greeceAOI);
+        loaderText.textContent = `Rendering NDVI tiles (${new Date(date).toISOString().slice(0,10)}, cloud ${cloud?.toFixed?.(1) ?? '—'}%)…`;
 
-          // Sentinel-2 L2A scale factor 0..10000 -> reflectance 0..1
-          const n = nir / 10000;
-          const r = red / 10000;
-          const ndvi = (n + r) === 0 ? NaN : (n - r) / (n + r);
-          if (!isFinite(ndvi)) return null;
+        ndviTiles = L.tileLayer(tileUrl, {
+          tileSize: 256,
+          attribution: 'Sentinel-2 L2A © Copernicus | Tiles: titiler.xyz | STAC: Earth Search'
+        }).addTo(map);
 
-          // Clamp for color ramp
-          const t = Math.max(-0.2, Math.min(0.8, ndvi));
-          // Simple red→yellow→green ramp
-          const g = Math.round(255 * (t + 0.2) / 1.0);
-          const rr = 255 - g;
-          return `rgb(${rr},${g},0)`;
-        }
-      });
-
-      return layer;
-    }
-
-    // --- Update map according to UI ---
-    async function updateMap() {
-      const year = yearSelector.value;
-      const maxCloud = cloudSlider.value;
-
-      // Remove existing NDVI
-      if (ndviLayer) { map.removeLayer(ndviLayer); ndviLayer = null; }
-      map.eachLayer(l => {}); // keep base
-
-      // Biodiversity layer
-      if (biodiversityLayer) map.removeLayer(biodiversityLayer);
-      if (biodiversityToggle.checked) {
-        biodiversityLayer = loadGeoJSONLayer(
-          biodiversityData,
-          () => ({ color: 'red', weight: 2, fillOpacity: 0.3 }),
-          (f, layer) => layer.bindPopup(f.properties.name)
-        ).addTo(map);
-      }
-
-      // ESCO layer
-      if (escoLayer) map.removeLayer(escoLayer);
-      if (escoToggle.checked) {
-        escoLayer = loadGeoJSONLayer(
-          escoData,
-          () => ({ color: 'blue', weight: 1, fillOpacity: 0.2 }),
-          (f, layer) => layer.bindPopup(`Skill: ${f.properties.skill}`)
-        ).addTo(map);
-      }
-
-      // NDVI (real Sentinel-2)
-      if (ndviToggle.checked) {
-        try {
-          loader.style.display = 'flex';
-          loaderText.textContent = 'Searching Earth Search STAC…';
-          const { red, nir, date, cloud } = await fetchLatestS2COGs(year, maxCloud);
-
-          loaderText.textContent = `Loading COGs (cloud ${cloud?.toFixed?.(1) ?? '—'}%, ${new Date(date).toISOString().slice(0,10)})…`;
-          ndviLayer = await buildNDVILayerFromCOGs(red, nir);
-          ndviLayer.addTo(map);
-
-          // Fit to layer footprint if available
-          try {
-            const b = ndviLayer.getBounds();
-            if (b && b.isValid()) map.fitBounds(b, { padding: [20,20] });
-          } catch (_) {}
-
-          // Show legend
-          ndviLegend.addTo(map);
-        } catch (err) {
-          console.error(err);
-          alert('Could not load Sentinel-2 NDVI for the selected filters.\nTry increasing max cloud cover or another year.');
-          if (map.hasControl && ndviLegend) map.removeControl(ndviLegend);
-        } finally {
-          loader.style.display = 'none';
-        }
-      } else {
-        // Hide legend when NDVI off
+        ndviLegend.addTo(map);
+      } catch (e) {
+        console.error(e);
+        alert('Could not load Sentinel-2 NDVI. Try increasing max cloud or a different year.');
         try { map.removeControl(ndviLegend); } catch(_) {}
+      } finally {
+        loader.style.display = 'none';
       }
     }
 
-    // Toggle handlers
-    yearSelector.addEventListener('change', updateMap);
-    cloudSlider.addEventListener('change', updateMap);
-    ndviToggle.addEventListener('change', updateMap);
-    biodiversityToggle.addEventListener('change', updateMap);
-    escoToggle.addEventListener('change', updateMap);
+    function updateWdpa() {
+      if (wdpaLayer) { map.removeLayer(wdpaLayer); wdpaLayer = null; }
+      if (!wdpaToggle.checked) return;
+
+      // WDPA FeatureService (polygons), public & updated monthly
+      wdpaLayer = L.esri.featureLayer({
+        url: 'https://data-gis.unep-wcmc.org/server/rest/services/ProtectedSites/The_World_Database_of_Protected_Areas/FeatureServer/1',
+        simplifyFactor: 0.5,
+        precision: 5,
+        style: () => ({ color: '#7e22ce', weight: 1, fillOpacity: 0.15 })
+      })
+      .bindPopup(layer => {
+        const p = layer.feature.properties || {};
+        const name = p.NAME || 'Protected Area';
+        const desig = p.DESIG || '';
+        const iucn = p.IUCN_CAT || '';
+        return `<strong>${name}</strong><br>${desig}${iucn ? ' · IUCN: ' + iucn : ''}`;
+      })
+      .addTo(map);
+    }
+
+    // OPTIONAL Natura 2000 (requires stable HTTPS WMS; many catalogs list HTTP only which will be blocked on HTTPS sites)
+    // function updateNatura() {
+    //   if (naturaLayer) { map.removeLayer(naturaLayer); naturaLayer = null; }
+    //   if (!naturaToggle.checked) return;
+    //   naturaLayer = L.tileLayer.wms('https://<YOUR_HTTPS_WMS_ENDPOINT>/wms', {
+    //     layers: '<NATURA_LAYER_NAME>',
+    //     format: 'image/png',
+    //     transparent: true
+    //   }).addTo(map);
+    // }
+
+    async function updateAll() {
+      await updateNdvi();
+      updateWdpa();
+      // updateNatura();
+    }
+
+    // Events
+    yearSelector.addEventListener('change', updateAll);
+    cloudSlider.addEventListener('change', updateAll);
+    ndviToggle.addEventListener('change', updateAll);
+    wdpaToggle.addEventListener('change', updateAll);
+    // naturaToggle?.addEventListener('change', updateAll);
 
     // Initial
-    updateMap();
+    updateAll();
   </script>
 </body>
 </html>
